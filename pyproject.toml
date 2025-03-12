@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "underdoc"
+version = "0.2.0"
+authors = [
+  { name = "Clarence Ho", email = "clarence@underdoc.io" },
+]
+description = "UnderDoc Python SDK"
+readme = "README.md"
+requires-python = ">=3.10"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "pydantic>=2.10.6",
+    "pydantic-settings>=2.7.1",
+    "httpx>=0.28.1",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/under-doc/underdoc-python-sdk"
