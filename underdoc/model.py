@@ -36,3 +36,14 @@ class ExpenseData(BaseModel):
 
 class ExpenseExtractionResponse(BaseModel):
     receipt_data: ExpenseData = Field(..., description="Extracted esxpense data")
+
+class ExpenseDataWithSource(BaseModel):
+    source_file_name: str = Field(..., description="The source file path")
+    expense_data: ExpenseData = Field(..., description="Extracted expense data")
+
+class ExpenseExtractionBatchResponse(BaseModel):
+    expense_data_list: List[ExpenseDataWithSource] = Field(..., description="List of extracted expense data with source file path")
+
+class BatchExecutionMode(str, Enum):
+    Sequential = "Sequential"
+    Parallel = "Parallel"

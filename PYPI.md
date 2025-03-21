@@ -25,7 +25,7 @@ pip install twine
 ### Install dependencies
 
 ```bash
-# Add dependency into setup.py
+# Add dependency into pyproject.toml
 
 # Run pip install
 pip install -e .
@@ -36,7 +36,7 @@ pip install -e .
 ### Update version number
 
 * Update underdoc/version.py for version number
-* Update version number in setup.py
+* Update version number in pyproject.toml
 
 ### Build package
 
