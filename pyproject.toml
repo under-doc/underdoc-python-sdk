@@ -20,6 +20,7 @@ dependencies = [
     "pydantic>=2.10.6",
     "pydantic-settings>=2.7.1",
     "httpx>=0.28.1",
+    "ray>=2.43.0",
 ]
 
 [project.urls]
