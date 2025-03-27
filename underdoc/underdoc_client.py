@@ -5,11 +5,14 @@ from .model import (
     ImageFormat, 
     ExpenseExtractionBatchResponse, 
     ExpenseDataWithSource, 
-    BatchExecutionMode)
+    BatchExecutionMode,
+    S3Object
+)
 import logging
 import base64
 import httpx
 import glob
+import boto3
 from .exceptions import UnderDocException
 import ray
 
@@ -138,19 +141,52 @@ class Client:
             image_format=image_format,
             image_data=image_data_encoded
         )
+    
+    def _get_request_from_s3_object(self,
+                                    s3_object: S3Object) -> ExpenseExtractionRequest:
+        """Get a request from an s3 object.
+        """
+        logger.info(f"Getting request from s3 object: {s3_object}")
+        s3 = boto3.client('s3')
+
+        try:
+            image_format = self._get_image_format(s3_object.object_key)
+
+            response = s3.get_object(Bucket=s3_object.bucket_name, Key=s3_object.object_key)
+            image_data = response['Body'].read()
+        except Exception as e:
+            logger.error(f"Error getting object from s3: {e}")
+            return None
+
+        # Encode the image data
+        image_data_encoded = base64.b64encode(image_data).decode("utf-8")
+
+        return ExpenseExtractionRequest(
+            image_format=image_format,
+            image_data=image_data_encoded
+        )
+    
+    def _get_files_from_s3_bucket(self, s3_bucket_name: str) -> list[str]:
+        """Get all files from an s3 bucket.
+        """
+        s3 = boto3.client('s3')
+        response = s3.list_objects_v2(Bucket=s3_bucket_name)
+        return [obj['Key'] for obj in response['Contents']]
 
     def expense_image_extract(self,
                               file_name: str | None = None,
-                              image_url: str | None = None) -> ExpenseExtractionResponse:
+                              image_url: str | None = None,
+                              s3_object: S3Object | None = None) -> ExpenseExtractionResponse:
         """Extract expense data from an image.
 
         Provide one of the following:
         - `file_name`: The path to the image file.
         - `image_url`: The url of the image.
+        - `s3_object`: The s3 object containing the image.
         """
 
-        if file_name is None and image_url is None:
-            raise ValueError("Either file_name or image_url must be provided.")
+        if file_name is None and image_url is None and s3_object is None:
+            raise ValueError("Either file_name or image_url or s3_object must be provided.")
 
         # Handle file name
         if file_name:
@@ -161,6 +197,11 @@ class Client:
         elif image_url:
             try:
                 request = self._get_request_from_image_url(image_url)
+            except ValueError as e:
+                raise UnderDocException(e)
+        elif s3_object:
+            try:
+                request = self._get_request_from_s3_object(s3_object)
             except ValueError as e:
                 raise UnderDocException(e)
             
@@ -188,16 +229,18 @@ class Client:
     @ray.remote
     def _expense_image_extract_parallel(self,
                               file_name: str | None = None,
-                              image_url: str | None = None) -> tuple[str, ExpenseExtractionResponse]:
+                              image_url: str | None = None,
+                              s3_object: S3Object | None = None) -> tuple[str, ExpenseExtractionResponse]:
         """Extract expense data from an image in parallel mode.
 
         Provide one of the following:
         - `file_name`: The path to the image file.
         - `image_url`: The url of the image.
+        - `s3_object`: The s3 object containing the image.
         """
 
-        if file_name is None and image_url is None:
-            raise ValueError("Either file_name or image_url must be provided.")
+        if file_name is None and image_url is None and s3_object is None:
+            raise ValueError("Either file_name or image_url or s3_object must be provided.")
 
         # Handle file name
         if file_name:
@@ -210,6 +253,12 @@ class Client:
             try:
                 source_file_name = image_url
                 request = self._get_request_from_image_url(image_url)
+            except ValueError as e:
+                raise UnderDocException(e)
+        elif s3_object:
+            try:
+                source_file_name = s3_object.object_key
+                request = self._get_request_from_s3_object(s3_object)
             except ValueError as e:
                 raise UnderDocException(e)
             
@@ -236,12 +285,14 @@ class Client:
 
     def expense_image_batch_extract(self,
                                     file_name_pattern: str | None = None,
+                                    s3_bucket_name: str | None = None,
                                     batch_execution_mode: BatchExecutionMode = BatchExecutionMode.Parallel) -> ExpenseExtractionBatchResponse:
         """Extract expense data from multiple images.
         Extract expense data from multiple images matching a file pattern.
 
         Args:
             file_name_pattern: A glob pattern to match image files (e.g. "*.jpg", "receipts/*.png")
+            s3_bucket_name: The name of the s3 bucket containing the images.
             batch_execution_mode: The execution mode, either Sequential or Parallel. Defaults to Parallel.
 
         Returns:
@@ -252,20 +303,30 @@ class Client:
             UnderDocException: If there is an error extracting data from any image
         """
 
-        if file_name_pattern is None:
-            raise ValueError("file_name_pattern is required.")
+        if file_name_pattern is None and s3_bucket_name is None:
+            raise ValueError("file_name_pattern or s3_bucket_name is required.")
 
-        logger.info(f"Extracting expense data from {file_name_pattern}, execution mode: {batch_execution_mode}")
+        if file_name_pattern:
+            logger.info(f"Extracting expense data from file pattern: {file_name_pattern}, execution mode: {batch_execution_mode}")
+        else:
+            logger.info(f"Extracting expense data from s3 bucket: {s3_bucket_name}, execution mode: {batch_execution_mode}")
 
         expense_data_list = []
 
-        # Get all files matching the pattern
-        file_names = glob.glob(file_name_pattern)
+        if file_name_pattern:
+            # Get all files matching the pattern
+            file_names = glob.glob(file_name_pattern)
+        else:
+            # Get all files from the s3 bucket
+            file_names = self._get_files_from_s3_bucket(s3_bucket_name)
         
         if batch_execution_mode == BatchExecutionMode.Parallel:
             ray.init()
             
-            response_futures = [self._expense_image_extract_parallel.remote(self, file_name=file_name) for file_name in file_names]
+            if file_name_pattern:
+                response_futures = [self._expense_image_extract_parallel.remote(self, file_name=file_name) for file_name in file_names]
+            else:
+                response_futures = [self._expense_image_extract_parallel.remote(self, s3_object=S3Object(bucket_name=s3_bucket_name, object_key=file_name)) for file_name in file_names]
         
             responses = ray.get(response_futures)
 
@@ -277,7 +338,10 @@ class Client:
                     ))
         else:
             for file_name in file_names:
-                response = self.expense_image_extract(file_name=file_name)
+                if file_name_pattern:
+                    response = self.expense_image_extract(file_name=file_name)
+                else:
+                    response = self.expense_image_extract(s3_object=S3Object(bucket_name=s3_bucket_name, object_key=file_name))
                 if response:
                     expense_data_list.append(ExpenseDataWithSource(
                         source_file_name=file_name,

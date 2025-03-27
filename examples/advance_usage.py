@@ -14,8 +14,8 @@ client = underdoc_client.Client()
 
 # Set the batch execution mode
 # Default is parallel mode, set to sequential mode if you want process images one by one
-# batch_execution_mode = BatchExecutionMode.Sequential
-batch_execution_mode = BatchExecutionMode.Parallel
+batch_execution_mode = BatchExecutionMode.Sequential
+# batch_execution_mode = BatchExecutionMode.Parallel
 
 tic = time.perf_counter()   
 response = client.expense_image_batch_extract(file_name_pattern="sample_expense_images/*.*",batch_execution_mode=batch_execution_mode)
