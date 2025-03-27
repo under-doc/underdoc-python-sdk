@@ -47,3 +47,7 @@ class ExpenseExtractionBatchResponse(BaseModel):
 class BatchExecutionMode(str, Enum):
     Sequential = "Sequential"
     Parallel = "Parallel"
+
+class S3Object(BaseModel):
+    bucket_name: str = Field(..., description="The name of the bucket")
+    object_key: str = Field(..., description="The key of the object")

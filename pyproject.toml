@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "underdoc"
-version = "0.3.0"
+version = "0.4.0"
 authors = [
   { name = "Clarence Ho", email = "clarence@underdoc.io" },
 ]
@@ -21,6 +21,7 @@ dependencies = [
     "pydantic-settings>=2.7.1",
     "httpx>=0.28.1",
     "ray>=2.43.0",
+    "boto3>=1.37.20"
 ]
 
 [project.urls]

@@ -7,4 +7,4 @@ __all__ = ["__version__", "Client", "UnderDocException",
            "ExpenseExtractionResponse", "ExpenseData", "ExpenseItem", 
            "Expense", "ImageFormat", "ExpenseExtractionRequest",
            "ExpenseDataWithSource", "ExpenseExtractionBatchResponse",
-           "BatchExecutionMode"]
+           "BatchExecutionMode", "S3Object"]
