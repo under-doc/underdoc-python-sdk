@@ -271,7 +271,7 @@ class Client:
             f"{self.api_endpoint}/expenses/extract",
             headers={"UNDERDOC_API_KEY": self.api_key},
             json=request.model_dump(),
-            timeout=60.0
+            timeout=3600.0
         )
 
         # Check if the request was successful
